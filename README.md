@@ -73,17 +73,21 @@
 
 ## ⚙️ 配置
 
-在 nonebot2 项目的`.env`或`.env.prod`文件中添加下表中的配置。
+在您的 nonebot2 项目的 `.env` 或 `.env.prod` 文件中添加以下配置项。
 
 | 配置项 | 必填 | 默认值 | 说明 |
-| :---: | :---: | :---: | :--- |
-| `JIMENG_ACCOUNTS` | **是** | `[]` | 即梦账号列表，格式为 `[{"email": "user1@example.com", "credit": 1000}, ...]` |
-| `JIMENG_SECRET_KEY_PREFIX` | **是** | `""` | 即梦 `session_id` 的固定前缀，通常是 `sess-` |
-| `JIMENG_OPEN_API_URL` | 否 | `https://api.jimmeng.com/api` | 即梦 OpenAPI 的地址 |
-| `JIMENG_MODEL` | 否 | `jimeng-diffusion-fast` | 使用的绘画模型 |
-| `JIMENG_MODEL_COST` | 否 | `20` | 单次绘图消耗的积分 |
-| `JIMENG_RESOLUTION` | 否 | `1024x1024` | 图片分辨率 |
-| `JIMENG_RATIO` | 否 | `1:1` | 图片比例，如 "1:1", "16:9", "9:16" 等。若未设置，文生图将启用智能比例 |
+| :---: |:--:| :---: | :--- |
+| `JIMENG_ACCOUNTS` | 否  | `[]` | 即梦账号列表。当 `JIMENG_USE_ACCOUNT=true` 时需要填写。格式为 `'[{"account": "user1@example.com", "password": "password1"}, ...]'` |
+| `JIMENG_USE_ACCOUNT` | 否  | `True` | 是否通过账号自动获取密钥。如果设为 `False`，则需要提供 `JIMENG_SECRET_KEY`。 |
+| `JIMENG_OPEN_API_URL`| 否  | `''` | 逆向 API 的地址。 |
+| `JIMENG_SECRET_KEY_PREFIX` | 否  | `''` | 如果你搭配逆向使用，可能需要填写密钥的前缀。 |
+| `JIMENG_MODEL` | 否  | `jimeng-4.5` | 使用的绘画模型。 |
+| `JIMENG_MODEL_COST` | 否  | `9` | 单次绘图消耗的点数。 |
+| `JIMENG_RESOLUTION` | 否  | `2k` | 图片分辨率。 |
+| `JIMENG_MAX_CONCURRENT_TASKS_PER_USER` | 否  | `2` | 每个用户的最大并发任务数。 |
+| `JIMENG_MAX_RETRIES` | 否  | `3` | 请求失败时的最大重试次数。 |
+| `JIMENG_RETRY_DELAY` | 否  | `1` | 每次重试的间隔时间（秒）。 |
+| `JIMENG_SECRET_KEY` | 否  | `""` | API 密钥。当 `JIMENG_USE_ACCOUNT=false` 时生效。 |
 
 ### `JIMENG_ACCOUNTS` 格式说明
 这是一个 JSON 字符串数组，每个对象代表一个即梦账号。插件启动时会根据此配置初始化 `session_id`。
@@ -95,6 +99,9 @@ JIMENG_ACCOUNTS='[{"email": "your_email1@example.com", "credit": 10000}, {"email
 JIMENG_SECRET_KEY_PREFIX="sess-"
 ```
 **注意**：由于 `.env` 文件格式限制，请确保整个 JSON 数组写在同一行，并用单引号或双引号包裹。
+
+## 💡 注意事项
+如果使用图生图功能，尽量使用刚刚发送的图片，以避免因图片缓存问题导致上传图片失败。
 
 ## 🎉 使用
 
@@ -117,3 +124,6 @@ JIMENG_SECRET_KEY_PREFIX="sess-"
 /即梦绘画 让她躺在一个洁白的床
 ```
 ![img.png](./assets/img.png)
+
+## 🙏 致谢
+感谢 [https://github.com/iptag/jimeng-api](https://github.com/iptag/jimeng-api) 提供的 OpenAPI 支持。
