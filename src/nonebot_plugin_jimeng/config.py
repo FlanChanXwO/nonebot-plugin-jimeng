@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ScopedConfig(BaseModel):
@@ -7,7 +7,7 @@ class ScopedConfig(BaseModel):
     # 每个用户的最大并发任务数
     max_concurrent_tasks_per_user: int = 2
     # 如果你需要登录
-    accounts: list[dict[str,str]] = []
+    accounts: list[dict[str, str]] = []
     # 最大重试次数
     max_retries: int = 3
     # 每次重试的间隔时间（秒）
@@ -28,4 +28,4 @@ class ScopedConfig(BaseModel):
     resolution: str = '2k'
 
 class Config(BaseModel):
-    jimeng: ScopedConfig
+    jimeng: ScopedConfig = Field(default_factory=ScopedConfig)
