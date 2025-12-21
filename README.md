@@ -2,7 +2,7 @@
     <a href="https://v2.nonebot.dev/store">
     <img src="https://raw.githubusercontent.com/fllesser/nonebot-plugin-template/refs/heads/resource/.docs/NoneBotPlugin.svg" width="310" alt="logo"></a>
 
-## ✨ nonebot-plugin-jimeng ✨
+## ✨ 即梦绘画 ✨
 [![LICENSE](https://img.shields.io/github/license/FlanChanXwO/nonebot-plugin-jimeng.svg)](./LICENSE)
 [![pypi](https://img.shields.io/pypi/v/nonebot-plugin-jimeng.svg)](https://pypi.python.org/pypi/nonebot-plugin-jimeng)
 [![python](https://img.shields.io/badge/python-3.10|3.11|3.12|3.13-blue.svg)](https://www.python.org)
@@ -15,22 +15,19 @@
 
 ## 📖 介绍
 
-这里是插件的详细介绍部分
+一个基于 NoneBot2 的 AI 绘画插件，通过调用**即梦（Jimeng）**的 OpenAPI 实现文生图和图生图功能。
+
+- **文生图**：根据文本描述生成图片。
+- **图生图**：结合图片和文本描述生成新的图片。
+- **多账号支持**：内置简单的多账号轮询和积分管理机制。
 
 ## 💿 安装
 
 <details open>
-<summary>使用 nb-cli 安装</summary>
+<summary>使用 nb-cli 安装 (推荐)</summary>
 在 nonebot2 项目的根目录下打开命令行, 输入以下指令即可安装
 
     nb plugin install nonebot-plugin-jimeng --upgrade
-使用 **pypi** 源安装
-
-    nb plugin install nonebot-plugin-jimeng --upgrade -i "https://pypi.org/simple"
-使用**清华源**安装
-
-    nb plugin install nonebot-plugin-jimeng --upgrade -i "https://pypi.tuna.tsinghua.edu.cn/simple"
-
 
 </details>
 
@@ -38,69 +35,85 @@
 <summary>使用包管理器安装</summary>
 在 nonebot2 项目的插件目录下, 打开命令行, 根据你使用的包管理器, 输入相应的安装命令
 
-<details open>
-<summary>uv</summary>
+<details>
+<summary>pip</summary>
 
-    uv add nonebot-plugin-jimeng
-安装仓库 master 分支
+    pip install nonebot-plugin-jimeng
 
-    uv add git+https://github.com/FlanChanXwO/nonebot-plugin-jimeng@master
 </details>
-
 <details>
 <summary>pdm</summary>
 
     pdm add nonebot-plugin-jimeng
-安装仓库 master 分支
 
-    pdm add git+https://github.com/FlanChanXwO/nonebot-plugin-jimeng@master
 </details>
 <details>
 <summary>poetry</summary>
 
     poetry add nonebot-plugin-jimeng
-安装仓库 master 分支
-
-    poetry add git+https://github.com/FlanChanXwO/nonebot-plugin-jimeng@master
-</details>
-
-打开 nonebot2 项目根目录下的 `pyproject.toml` 文件, 在 `[tool.nonebot]` 部分追加写入
-
-    plugins = ["nonebot_plugin_jimeng"]
 
 </details>
-
 <details>
-<summary>使用 nbr 安装(使用 uv 管理依赖可用)</summary>
+<summary>uv</summary>
 
-[nbr](https://github.com/fllesser/nbr) 是一个基于 uv 的 nb-cli，可以方便地管理 nonebot2
-
-    nbr plugin install nonebot-plugin-jimeng
-使用 **pypi** 源安装
-
-    nbr plugin install nonebot-plugin-jimeng -i "https://pypi.org/simple"
-使用**清华源**安装
-
-    nbr plugin install nonebot-plugin-jimeng -i "https://pypi.tuna.tsinghua.edu.cn/simple"
+    uv pip install nonebot-plugin-jimeng
 
 </details>
+
+</details>
+
+安装后，请打开 nonebot2 项目根目录下的 `pyproject.toml` 文件, 在 `[tool.nonebot]` 部分的 `plugins` 列表中添加 `nonebot_plugin_jimeng` 以加载插件。
+
+    [tool.nonebot]
+    plugins = [
+        # ... other plugins
+        "nonebot_plugin_jimeng"
+    ]
 
 
 ## ⚙️ 配置
 
-在 nonebot2 项目的`.env`文件中添加下表中的必填配置
+在 nonebot2 项目的`.env`或`.env.prod`文件中添加下表中的配置。
 
-| 配置项  | 必填  | 默认值 |   说明   |
-| :-----: | :---: | :----: | :------: |
-| 配置项1 |  是   |   无   | 配置说明 |
-| 配置项2 |  否   |   无   | 配置说明 |
+| 配置项 | 必填 | 默认值 | 说明 |
+| :---: | :---: | :---: | :--- |
+| `JIMENG_ACCOUNTS` | **是** | `[]` | 即梦账号列表，格式为 `[{"email": "user1@example.com", "credit": 1000}, ...]` |
+| `JIMENG_SECRET_KEY_PREFIX` | **是** | `""` | 即梦 `session_id` 的固定前缀，通常是 `sess-` |
+| `JIMENG_OPEN_API_URL` | 否 | `https://api.jimmeng.com/api` | 即梦 OpenAPI 的地址 |
+| `JIMENG_MODEL` | 否 | `jimeng-diffusion-fast` | 使用的绘画模型 |
+| `JIMENG_MODEL_COST` | 否 | `20` | 单次绘图消耗的积分 |
+| `JIMENG_RESOLUTION` | 否 | `1024x1024` | 图片分辨率 |
+| `JIMENG_RATIO` | 否 | `1:1` | 图片比例，如 "1:1", "16:9", "9:16" 等。若未设置，文生图将启用智能比例 |
+
+### `JIMENG_ACCOUNTS` 格式说明
+这是一个 JSON 字符串数组，每个对象代表一个即梦账号。插件启动时会根据此配置初始化 `session_id`。
+
+**示例：**
+```env
+# .env.prod
+JIMENG_ACCOUNTS='[{"email": "your_email1@example.com", "credit": 10000}, {"email": "your_email2@example.com", "credit": 5000}]'
+JIMENG_SECRET_KEY_PREFIX="sess-"
+```
+**注意**：由于 `.env` 文件格式限制，请确保整个 JSON 数组写在同一行，并用单引号或双引号包裹。
 
 ## 🎉 使用
+
 ### 指令表
-| 指令  | 权限  | 需要@ | 范围  |   说明   |
-| :---: | :---: | :---: | :---: | :------: |
-| 指令1 | 主人  |  否   | 私聊  | 指令说明 |
-| 指令2 | 群员  |  是   | 群聊  | 指令说明 |
+| 指令 | 说明 |
+| :---: | :--- |
+| `/即梦绘画 <关键词>` | **文生图**。根据提供的关键词进行创作。 |
+| `/即梦绘画 <关键词>` (回复图片) | **图生图**。回复一张图片，并附上关键词，将在原图基础上进行创作。 |
 
 ### 🎨 效果图
-如果有效果图的话
+**文生图**
+```
+/即梦绘画 画一个二次元狐娘给我
+```
+![img_1.png](./assets/img_1.png)
+
+**图生图**
+(回复一张图片)
+```
+/即梦绘画 让她躺在一个洁白的床
+```
+![img.png](./assets/img.png)
