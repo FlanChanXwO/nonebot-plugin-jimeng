@@ -12,6 +12,8 @@ class ScopedConfig(BaseModel):
     max_retries: int = 3
     # 每次重试的间隔时间（秒）
     retry_delay: int = 1
+    # 请求超时时间（秒）
+    timeout: int = 300
     # 接口地址
     open_api_url: str = ''
     # 密钥（当use_account=true失效）

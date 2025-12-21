@@ -124,7 +124,7 @@ async def handle_jimeng_draw(event: MessageEvent,
         try:
             # --- 发送请求 ---
             async with httpx.AsyncClient() as client:
-                response = await client.post(api_url, json=payload, headers=headers, timeout=180.0)
+                response = await client.post(api_url, json=payload, headers=headers, timeout=plugin_config.timeout)
 
             if response.status_code == 200:
                 # --- 处理成功响应 ---
