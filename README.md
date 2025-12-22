@@ -84,7 +84,7 @@
 |             `JIMENG__MODEL`             | 否  | `jimeng-4.5` | 默认使用的绘画模型。                                                                                                                        |
 |          `JIMENG__RESOLUTION`           | 否  | `2k` | 图片分辨率。                                                                                                                            |
 | `JIMENG__MAX_CONCURRENT_TASKS_PER_USER` | 否  | `2` | 每个用户的最大并发任务数。                                                                                                                     |
-|          `JIMENG__MAX_RETRIES`          | 否  | `3` | 请求失败时的最大重试次数。                                                                                                                     |
+|          `JIMENG__MAX_RETRIES`          | 否  | `3` | 请求失败时的最大重试次数，一般是上传图片出现问题重试。                                                                                                                     |
 |          `JIMENG__RETRY_DELAY`          | 否  | `1` | 每次重试的间隔时间（秒）。                                                                                                                     |
 |            `JIMENG__TIMEOUT`            | 否  | `1` | 发送API请求的超时时间（秒）。                                                                                                                  |
 |          `JIMENG__SECRET_KEY`           | 否  | `""` | API 密钥。当 `JIMENG_USE_ACCOUNT=false` 时生效。                                                                                          |
