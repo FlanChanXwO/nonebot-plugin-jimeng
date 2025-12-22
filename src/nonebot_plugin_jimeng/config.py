@@ -18,12 +18,8 @@ class ScopedConfig(BaseModel):
     open_api_url: str = ''
     # 密钥（当use_account=true失效）
     secret_key: str = ""
-    # 密钥前缀，如果你需要搭配逆向使用
-    secret_key_prefix: str = ""
-    # 模型
+    # 默认模型
     model: str = 'jimeng-4.5'
-    # 模型消耗点数
-    model_cost: int = 9
     # 分辨率
     resolution: str = '2k'
 

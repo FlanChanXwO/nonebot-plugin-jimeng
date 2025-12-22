@@ -10,9 +10,10 @@ from nonebot.internal.params import Depends
 from nonebot.log import logger
 from nonebot.params import RegexGroup
 from nonebot.plugin import PluginMetadata, get_plugin_config
-
+from .models import get_cost_by_id
 from .concurrency import concurrency_limit
 from .config import Config
+from .utils import key_prefix_by_region
 from .session_manager import SessionManager
 
 __plugin_meta__ = PluginMetadata(
@@ -25,7 +26,7 @@ __plugin_meta__ = PluginMetadata(
     homepage="https://github.com/FlanChanXwO/nonebot-plugin-jimeng",
     extra={
         "author": "FlanChanXwO",
-        "version": "0.1.0",
+        "version": "0.1.5",
     },
 )
 
@@ -52,7 +53,8 @@ async def handle_jimeng_draw(event: MessageEvent,
                              prompt_group: tuple = RegexGroup()):
     prompt = prompt_group[0].strip()
     user_id = event.get_user_id()
-    if type(event) == GroupMessageEvent:
+    is_in_group = type(event) == GroupMessageEvent
+    if is_in_group:
         resp = await bot.get_group_member_info(group_id=cast(GroupMessageEvent, event).group_id,
                                                user_id=int(bot.self_id),
                                                no_cache=False)
@@ -77,38 +79,45 @@ async def handle_jimeng_draw(event: MessageEvent,
         # 如果没有图片则提示
         if not is_img2img:
             await jimeng_matcher.finish(
-                MessageSegment.at(user_id) + MessageSegment.text("\n【即梦绘画】\n请引用图片进行图生图绘画哦！"))
+                ((MessageSegment.at(user_id) + "\n" if is_in_group else "") if is_in_group else "") + MessageSegment.text("【即梦绘画】\n请引用图片进行图生图绘画哦！"))
             return
     if not prompt:
-        await jimeng_matcher.finish(MessageSegment.at(user_id) + MessageSegment.text(
-            "\n【即梦绘画】\n请输入你想要画的内容，或者回复一张图片并加上描述哦！"))
+        await jimeng_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+            "【即梦绘画】\n请输入你想要画的内容，或者回复一张图片并加上描述哦！"))
         return
 
     # --- 积分和账号检查 ---
-    cost = plugin_config.model_cost  # 默认成本，你可以为图生图设置不同成本
-    account = session_manager.get_available_account(cost)
+    cost = get_cost_by_id(plugin_config.model)
+    # 预期消耗点数
+    expect_cost = cost * 4
+    account = session_manager.get_available_account(expect_cost)
 
     if not account:
-        await jimeng_matcher.finish(MessageSegment.at(user_id) + MessageSegment.text(
-            f"\n【即梦绘画】\n当前所有账号积分不足以支付本次消耗（需要 {cost} 积分），请稍后再试。"))
+        await jimeng_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+            f"【即梦绘画】\n当前所有账号积分不足以支付本次消耗（需要 {expect_cost} 积分），请稍后再试。"))
         return
-
     session_id = account["session_id"]
     email = account["email"]
-    await jimeng_matcher.send(MessageSegment.at(user_id) + MessageSegment.text(
-        f"\n【即梦绘图】\n{bot_name}正在绘画哦，花费时间至少1~3分钟，请稍候..."))
+    region = account["region"]
+    logger.info("使用账号 {} 进行绘图，预估消耗 {} 积分。".format(email, expect_cost))
+
+    # --- 发送初始提示 ---
+    await jimeng_matcher.send((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+        f"【即梦绘图】\n{bot_name}正在绘画哦，花费时间至少1~3分钟，请稍候..."))
     # 从配置中获取重试次数和延迟
     max_retries = plugin_config.max_retries
     retry_delay = plugin_config.retry_delay
 
     if is_img2img:
         await jimeng_matcher.send(
-            MessageSegment.at(user_id) + MessageSegment.text("\n【即梦绘画】\n正在上传图片，请稍候..."))
+            (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text("【即梦绘画】\n正在上传图片，请稍候..."))
 
     # --- 构建请求 ---
     api_url = f"{plugin_config.open_api_url}/v1/images/{'compositions' if is_img2img else 'generations'}"
+    key_prefix = key_prefix_by_region(region)
+    logger.debug("使用 API URL: {}，密钥前缀：{}".format(api_url,key_prefix))
     headers = {
-        "Authorization": f"Bearer {plugin_config.secret_key_prefix}{session_id}" if plugin_config.use_account else plugin_config.secret_key,
+        "Authorization": f"Bearer {key_prefix}{session_id}" if plugin_config.use_account else plugin_config.secret_key,
         "Content-Type": "application/json"
     }
     payload = {
@@ -151,12 +160,13 @@ async def handle_jimeng_draw(event: MessageEvent,
                     raise Exception(message or "API返回未知错误，data为空。")
 
                 # --- 真正成功的逻辑 ---
-                if not plugin_config.use_account:
-                    await session_manager.update_credit(email, cost)
-                    logger.success(f"账号 {email} 绘图成功，消耗 {cost} 积分。")
-
                 img_count = len(img_url_json_list)
-                images_msgs = MessageSegment.at(user_id) + MessageSegment.text(f"\n【即梦绘画】\n完成【共{img_count}张】")
+                actual_cost = img_count * cost
+                if plugin_config.use_account:
+                    await session_manager.update_credit(email, actual_cost)
+                logger.success(f"账号 {email} 绘图成功，消耗 {actual_cost} 积分。")
+
+                images_msgs = (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(f"【即梦绘画】\n完成【共{img_count}张】")
 
                 async def download_image(url: str, client: httpx.AsyncClient) -> bytes:
                     """下载单个图片并返回其二进制内容"""
@@ -198,7 +208,6 @@ async def handle_jimeng_draw(event: MessageEvent,
                 logger.info(f"图片全部下载完成，正在发送 {img_count} 个图片结果。")
                 # 发送图片
                 await jimeng_matcher.finish(images_msgs)
-
                 # 成功处理后，必须跳出重试循环
                 break
 
@@ -206,8 +215,8 @@ async def handle_jimeng_draw(event: MessageEvent,
                 # --- 处理失败响应 (如 4xx, 5xx 错误) ---
                 # 这种错误通常是不可重试的（如认证失败、参数错误），所以直接失败
                 logger.error(f"调用即梦 API 失败: {response.status_code} {response.text}")
-                await jimeng_matcher.finish(MessageSegment.at(user_id) + MessageSegment.text(
-                    f"\n【即梦绘画】\n绘图失败了，服务器返回错误：\n错误码：{response.status_code}\n错误信息： {response.text}"))
+                await jimeng_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+                    f"【即梦绘画】\n绘图失败了，服务器返回错误：\n错误码：{response.status_code}\n错误信息： {response.text}"))
                 # 失败后也要跳出循环
                 break
 
@@ -219,9 +228,7 @@ async def handle_jimeng_draw(event: MessageEvent,
             logger.exception(f"处理即梦绘图请求时发生错误 (尝试次数 {attempt + 1}): {e}")
             # 如果是最后一次尝试，则发送最终失败消息
             if attempt >= max_retries:
-                await jimeng_matcher.finish(MessageSegment.at(user_id) + MessageSegment.text(
-                    f"\n【即梦绘画】\n发生严重错误，已重试 {max_retries} 次但仍失败：{e}"))
+                await jimeng_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+                    f"【即梦绘画】\n发生严重错误，已重试 {max_retries} 次但仍失败：{e}"))
             else:
-                # 如果不是最后一次，可以选择不在这里发送消息，让它继续重试
-                # 或者，如果您希望每次重试都通知用户，可以在这里加一个 send()
                 pass

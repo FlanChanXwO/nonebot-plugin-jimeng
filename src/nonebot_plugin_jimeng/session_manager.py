@@ -6,6 +6,7 @@ import httpx
 import aiofiles
 from typing import List, Dict, Optional, Any, Tuple
 from nonebot.log import logger
+
 require("nonebot_plugin_localstore")
 from nonebot_plugin_localstore import get_cache_file
 
@@ -16,7 +17,7 @@ class SessionManager:
     管理和维护用于 API 认证的 session 及用户积分。
     """
 
-    def __init__(self, accounts: List[Dict[str, str]]):
+    def __init__(self, accounts: List[Dict[str,str]]):
         self._accounts_config = accounts
         self._cache_file = get_cache_file(PLUGIN_NAME, "cache.json")
         self._accounts_data: Dict[str, Dict[str, Any]] = {}
@@ -92,7 +93,7 @@ class SessionManager:
         logger.error(f"账号 {email} 登录或获取积分失败。")
         return None
 
-    async def _process_account(self, acc_conf: dict, initial_data: dict) -> tuple[str, dict | None]:
+    async def _process_account(self, acc_conf: Dict[str,str], initial_data: dict) -> tuple[str, dict | None]:
         """
         处理单个账号的登录/验证逻辑。
         这是一个辅助函数，用于被 asyncio.gather 并发调用。
@@ -103,21 +104,21 @@ class SessionManager:
         """
         email = acc_conf["account"]
         password = acc_conf["password"]
-
+        region = acc_conf["region"]
         cached_data = initial_data.get(email)
         if cached_data and "session_id" in cached_data:
             credit = await self._verify_and_get_credit(cached_data["session_id"])
             if credit is not None:
                 logger.success(f"账号 {email} 使用缓存的 session 登录成功，当前积分为: {credit}。")
                 # 返回 email 和更新后的数据
-                return email, {"session_id": cached_data["session_id"], "credit": credit}
+                return email, {"session_id": cached_data["session_id"], "credit": credit, "region": region}
             else:
                 logger.warning(f"账号 {email} 的缓存 session 已失效，尝试重新登录。")
 
         login_data = await self._login_and_get_data(email, password)
         if login_data:
             # 返回 email 和新的登录数据
-            return email, {"session_id": login_data[0], "credit": login_data[1]}
+            return email, {"session_id": login_data[0], "credit": login_data[1], "region": region}
 
         # 如果所有尝试都失败了
         return email, None
@@ -159,7 +160,7 @@ class SessionManager:
 
         # 6. 将最终的、最新的数据写回缓存
         await self._write_cache()
-        logger.info(f"即梦绘图插件初始化完成，可用账号数量: {self.get_available_account_count()}")
+        logger.info(f"即梦绘画插件初始化完成，可用账号数量: {self.get_available_account_count()}")
 
     def get_available_account(self, cost: int) -> Optional[Dict[str, Any]]:
         """获取一个积分充足的可用账号"""

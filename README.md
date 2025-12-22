@@ -77,32 +77,30 @@
 
 |                  配置项                   | 必填 | 默认值 | 说明                                                                                                                |
 |:--------------------------------------:|:--:| :---: |:------------------------------------------------------------------------------------------------------------------|
-|           `JIMENG_ACCOUNTS`            | 否  | `[]` | 即梦账号列表。当 `JIMENG_USE_ACCOUNT=true` 时需要填写。格式为 `'[{"account": "user1@example.com", "password": "password1"}, ...]'` |
-|          `JIMENG_USE_ACCOUNT`          | 否  | `True` | 是否通过账号自动获取密钥。如果设为 `False`，则需要提供 `JIMENG_SECRET_KEY`。                                                              |
-|         `JIMENG_OPEN_API_URL`          | 否  | `''` | 逆向 API 的地址。                                                                                                       |
-|       `JIMENG_SECRET_KEY_PREFIX`       | 否  | `''` | 如果你搭配逆向使用，可能需要填写密钥的前缀。                                                                                            |
-|             `JIMENG_MODEL`             | 否  | `jimeng-4.5` | 使用的绘画模型。                                                                                                          |
-|          `JIMENG_MODEL_COST`           | 否  | `9` | 单次绘图消耗的点数。                                                                                                        |
-|          `JIMENG_RESOLUTION`           | 否  | `2k` | 图片分辨率。                                                                                                            |
-| `JIMENG_MAX_CONCURRENT_TASKS_PER_USER` | 否  | `2` | 每个用户的最大并发任务数。                                                                                                     |
-|          `JIMENG_MAX_RETRIES`          | 否  | `3` | 请求失败时的最大重试次数。                                                                                                     |
-|          `JIMENG_RETRY_DELAY`          | 否  | `1` | 每次重试的间隔时间（秒）。                                                                                                     |
-|            `JIMENG_TIMEOUT`            | 否  | `1` | 发送API请求的超时时间（秒）。                                                                                                  |
-|          `JIMENG_SECRET_KEY`           | 否  | `""` | API 密钥。当 `JIMENG_USE_ACCOUNT=false` 时生效。                                                                          |
+|           `JIMENG__ACCOUNTS`           | 否  | `[]` | 即梦账号列表。当 `JIMENG_USE_ACCOUNT=true` 时需要填写。格式为 `'[{"account": "user1@example.com", "password": "password1"}, ...]'` |
+|          `JIMENG__USE_ACCOUNT`          | 否  | `True` | 是否通过账号自动获取密钥。如果设为 `False`，则需要提供 `JIMENG_SECRET_KEY`。                                                              |
+|         `JIMENG__OPEN_API_URL`          | 否  | `''` | 逆向 API 的地址。                                                                                                       |
+|       `JIMENG__SECRET_KEY_PREFIX`       | 否  | `''` | 如果你搭配逆向使用，可能需要填写密钥的前缀。                                                                                            |
+|             `JIMENG__MODEL`             | 否  | `jimeng-4.5` | 默认使用的绘画模型。                                                                                                        |
+|          `JIMENG__RESOLUTION`           | 否  | `2k` | 图片分辨率。                                                                                                            |
+| `JIMENG__MAX_CONCURRENT_TASKS_PER_USER` | 否  | `2` | 每个用户的最大并发任务数。                                                                                                     |
+|          `JIMENG__MAX_RETRIES`          | 否  | `3` | 请求失败时的最大重试次数。                                                                                                     |
+|          `JIMENG__RETRY_DELAY`          | 否  | `1` | 每次重试的间隔时间（秒）。                                                                                                     |
+|            `JIMENG__TIMEOUT`            | 否  | `1` | 发送API请求的超时时间（秒）。                                                                                                  |
+|          `JIMENG__SECRET_KEY`           | 否  | `""` | API 密钥。当 `JIMENG_USE_ACCOUNT=false` 时生效。                                                                          |
 
 ### `JIMENG_ACCOUNTS` 格式说明
 这是一个 JSON 字符串数组，每个对象代表一个即梦账号。插件启动时会根据此配置初始化 `session_id`。
 
-**示例：**
+**配置示例：**
+JIMENG__ACCOUNTS配置示例
 ```env
 # .env.prod
-JIMENG_ACCOUNTS='[{"email": "your_email1@example.com", "credit": 10000}, {"email": "your_email2@example.com", "credit": 5000}]'
-JIMENG_SECRET_KEY_PREFIX="sess-"
+JIMENG_ACCOUNTS='[{"email": "your_email1@example.com", "password": "12234" , "region": "hk"}, {"email": "your_email1@example.com", "password": "12234" , "region": "jp"}]'
 ```
-**注意**：由于 `.env` 文件格式限制，请确保整个 JSON 数组写在同一行，并用单引号或双引号包裹。
 
 ## 💡 注意事项
-如果使用图生图功能，尽量使用刚刚发送的图片，以避免因图片缓存问题导致上传图片失败。
+如果使用图生图功能，请确保你的图片可以被正确访问
 
 ## 🎉 使用
 
