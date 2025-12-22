@@ -80,7 +80,6 @@
 |           `JIMENG__ACCOUNTS`           | 否  | `[]` | 即梦账号（目前主要是国际服支持账密登录）列表。当 `JIMENG_USE_ACCOUNT=true` 时需要填写。格式为 `'[{"account": "user1@example.com", "password": "password1"}, ...]'` |
 |          `JIMENG__USE_ACCOUNT`          | 否  | `True` | 是否通过账号自动获取密钥。如果设为 `False`，则需要提供 `JIMENG_SECRET_KEY`。                                                                              |
 |         `JIMENG__OPEN_API_URL`          | 否  | `''` | 逆向 API 的地址或官方API地址。                                                                                                               |
-|       `JIMENG__SECRET_KEY_PREFIX`       | 否  | `''` | 如果你搭配逆向使用，可能需要填写密钥的前缀。                                                                                                            |
 |             `JIMENG__MODEL`             | 否  | `jimeng-4.5` | 默认使用的绘画模型。                                                                                                                        |
 |          `JIMENG__RESOLUTION`           | 否  | `2k` | 图片分辨率。                                                                                                                            |
 | `JIMENG__MAX_CONCURRENT_TASKS_PER_USER` | 否  | `2` | 每个用户的最大并发任务数。                                                                                                                     |
