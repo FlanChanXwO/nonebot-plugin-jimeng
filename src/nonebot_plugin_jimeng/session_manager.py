@@ -162,6 +162,8 @@ class SessionManager:
         await self._write_cache()
         logger.info(f"即梦绘画插件初始化完成，可用账号数量: {self.get_available_account_count()}")
 
+
+
     def get_available_account(self, cost: int) -> Optional[Dict[str, Any]]:
         """获取一个积分充足的可用账号"""
         available_accounts = [
@@ -181,7 +183,54 @@ class SessionManager:
         await self._write_cache()
 
     def get_available_account_count(self) -> int:
+        """获取当前可用账号数量"""
         return len(self._accounts_data)
 
     def is_available(self) -> bool:
+        """检查是否有可用账号"""
         return self.get_available_account_count() > 0
+
+    async def refresh_all_credits(self) -> None:
+        """并发检查所有账号的 session / 积分并刷新内存与缓存"""
+        async with self._lock:
+            initial_accounts_data = await self._read_cache()
+            # 用于根据 email 找回对应的配置，便于重试
+            acc_conf_map = {acc_conf["account"]: acc_conf for acc_conf in self._accounts_config}
+            tasks = [
+                self._process_account(acc_conf, initial_accounts_data)
+                for acc_conf in self._accounts_config
+            ]
+            logger.info(f"正在并发刷新 {len(tasks)} 个账号的积分...")
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            updated_accounts_data: Dict[str, Dict[str, Any]] = {}
+
+            for res in results:
+                if isinstance(res, Exception):
+                    logger.error(f"刷新某个账号时发生未捕获的异常: {res}")
+                    continue
+                email, new_data = res
+                if new_data:
+                    updated_accounts_data[email] = new_data
+                else:
+                    # 如果第一次刷新失败，重试一次
+                    acc_conf = acc_conf_map.get(email)
+                    if not acc_conf:
+                        logger.warning(f"账号 {email} 刷新失败，未找到配置，已从可用列表中移除。")
+                        continue
+                    try:
+                        logger.info(f"账号 {email} 刷新失败，尝试重试一次...")
+                        retry_email, retry_data = await self._process_account(acc_conf, initial_accounts_data)
+                        if retry_data:
+                            updated_accounts_data[retry_email] = retry_data
+                            logger.success(f"账号 {email} 重试成功。")
+                        else:
+                            logger.warning(f"账号 {email} 重试失败，已从可用列表中移除。")
+                    except Exception as e:
+                        logger.error(f"账号 {email} 重试时发生异常: {e}")
+
+            # 用本次运行的最新结果替换内存数据
+            self._accounts_data = updated_accounts_data
+
+        await self._write_cache()
+        logger.info(f"积分刷新完成，可用账号数量: {self.get_available_account_count()}")

@@ -2,7 +2,7 @@ import asyncio
 from typing import cast
 
 import httpx
-from nonebot import on_regex, get_driver
+from nonebot import on_regex, get_driver, require
 from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment, GroupMessageEvent
 from nonebot.adapters.onebot.v11 import Bot as OneBotV11Bot
 from nonebot.exception import FinishedException
@@ -15,7 +15,8 @@ from .concurrency import concurrency_limit
 from .config import Config
 from .utils import key_prefix_by_region
 from .session_manager import SessionManager
-
+require("nonebot_plugin_apscheduler")
+from nonebot_plugin_apscheduler import scheduler
 __plugin_meta__ = PluginMetadata(
     name="即梦绘画",
     description="使用即梦 OpenAPI 进行 AI 绘画（支持文生图和图生图）",
@@ -26,7 +27,7 @@ __plugin_meta__ = PluginMetadata(
     homepage="https://github.com/FlanChanXwO/nonebot-plugin-jimeng",
     extra={
         "author": "FlanChanXwO",
-        "version": "0.1.5",
+        "version": "0.1.6",
     },
 )
 
@@ -39,6 +40,9 @@ session_manager = SessionManager(plugin_config.accounts)
 async def on_startup():
     if plugin_config.use_account:
         await session_manager.initialize_sessions()
+        # --- 开启定时任务 ---
+        logger.info("即梦绘画插件初始化完成，开启定时任务刷新积分。")
+        scheduler.add_job(session_manager.refresh_all_credits, "interval", days=1, id="jimeng_refresh_credits")
     else:
         logger.info("即梦绘画插件未启用多账号登录，使用固定密钥。")
 
