@@ -8,9 +8,7 @@ from typing import List, Dict, Optional, Any, Tuple
 from nonebot.log import logger
 
 require("nonebot_plugin_localstore")
-from nonebot_plugin_localstore import get_cache_file
-
-PLUGIN_NAME = "nonebot_plugin_jimeng"
+from nonebot_plugin_localstore import get_plugin_cache_file
 
 class SessionManager:
     """
@@ -19,7 +17,7 @@ class SessionManager:
 
     def __init__(self, accounts: List[Dict[str,str]]):
         self._accounts_config = accounts
-        self._cache_file = get_cache_file(PLUGIN_NAME, "cache.json")
+        self._cache_file = get_plugin_cache_file("cache.json")
         self._accounts_data: Dict[str, Dict[str, Any]] = {}
         self._lock = asyncio.Lock()
 
