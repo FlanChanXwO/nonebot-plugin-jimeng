@@ -736,7 +736,7 @@ wheels = [
 
 [[package]]
 name = "nonebot-plugin-jimeng"
-version = "0.1.7"
+version = "0.1.8"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },

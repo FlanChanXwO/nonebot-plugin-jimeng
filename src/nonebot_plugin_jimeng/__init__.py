@@ -9,7 +9,10 @@ from nonebot.exception import FinishedException
 from nonebot.internal.params import Depends
 from nonebot.log import logger
 from nonebot.params import RegexGroup
+from nonebot.permission import SUPERUSER
 from nonebot.plugin import PluginMetadata, get_plugin_config
+from nonebot.plugin.on import on_command
+
 from .models import get_cost_by_id
 from .concurrency import concurrency_limit
 from .config import Config
@@ -20,14 +23,14 @@ from nonebot_plugin_apscheduler import scheduler
 __plugin_meta__ = PluginMetadata(
     name="即梦绘画",
     description="使用即梦 OpenAPI 进行 AI 绘画（支持文生图和图生图）",
-    usage="文生图: /即梦绘画 [关键词]\n图生图: 回复一张图片并使用 /即梦绘画 [关键词]",
+    usage="文生图: \"即梦绘画 [关键词]\"\n图生图: 回复一张图片并使用 \"即梦绘画 [关键词]\" 进行绘画\n查询积分: \"即梦积分\"",
     type="application",
     config=Config,
     supported_adapters={"~onebot.v11"},
     homepage="https://github.com/FlanChanXwO/nonebot-plugin-jimeng",
     extra={
         "author": "FlanChanXwO",
-        "version": "0.1.7",
+        "version": "0.1.8",
     },
 )
 
@@ -42,15 +45,16 @@ async def on_startup():
         await session_manager.initialize_sessions()
         # --- 开启定时任务 ---
         logger.info("即梦绘画插件初始化完成，开启定时任务刷新积分。")
-        scheduler.add_job(session_manager.refresh_all_credits, "interval", days=1, id="jimeng_refresh_credits")
+        scheduler.add_job(session_manager.refresh_all_credits, "interval", hours=plugin_config.refresh_interval, id="jimeng_refresh_credits")
     else:
         logger.info("即梦绘画插件未启用多账号登录，使用固定密钥。")
 
 
-jimeng_matcher = on_regex(r"^/即梦绘画\s*(.*)$", priority=5, block=True)
+jimeng_draw_matcher = on_regex(r"^/即梦绘画\s*(.*)$", priority=5, block=True)
+jimeng_credit_matcher = on_command("即梦积分", priority=5, block=True,permission=SUPERUSER)
 
 
-@jimeng_matcher.handle()
+@jimeng_draw_matcher.handle()
 async def handle_jimeng_draw(event: MessageEvent,
                              bot: OneBotV11Bot,
                              _=Depends(concurrency_limit),  # 依赖注入 - 拦截器
@@ -82,11 +86,11 @@ async def handle_jimeng_draw(event: MessageEvent,
                 break
         # 如果没有图片则提示
         if not is_img2img:
-            await jimeng_matcher.finish(
+            await jimeng_draw_matcher.finish(
                 ((MessageSegment.at(user_id) + "\n" if is_in_group else "") if is_in_group else "") + MessageSegment.text("【即梦绘画】\n请引用图片进行图生图绘画哦！"))
             return
     if not prompt:
-        await jimeng_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+        await jimeng_draw_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
             "【即梦绘画】\n请输入你想要画的内容，或者回复一张图片并加上描述哦！"))
         return
 
@@ -97,7 +101,7 @@ async def handle_jimeng_draw(event: MessageEvent,
     account = session_manager.get_available_account(expect_cost)
 
     if not account:
-        await jimeng_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+        await jimeng_draw_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
             f"【即梦绘画】\n当前所有账号积分不足以支付本次消耗（需要 {expect_cost} 积分），请稍后再试。"))
         return
     session_id = account["session_id"]
@@ -106,14 +110,14 @@ async def handle_jimeng_draw(event: MessageEvent,
     logger.info("使用账号 {} 进行绘图，预估消耗 {} 积分。".format(email, expect_cost))
 
     # --- 发送初始提示 ---
-    await jimeng_matcher.send((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+    await jimeng_draw_matcher.send((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
         f"【即梦绘图】\n{bot_name}正在绘画哦，花费时间至少1~3分钟，请稍候..."))
     # 从配置中获取重试次数和延迟
     max_retries = plugin_config.max_retries
     retry_delay = plugin_config.retry_delay
 
     if is_img2img:
-        await jimeng_matcher.send(
+        await jimeng_draw_matcher.send(
             (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text("【即梦绘画】\n正在上传图片，请稍候..."))
 
     # --- 构建请求 ---
@@ -211,7 +215,7 @@ async def handle_jimeng_draw(event: MessageEvent,
 
                 logger.info(f"图片全部下载完成，正在发送 {img_count} 个图片结果。")
                 # 发送图片
-                await jimeng_matcher.finish(images_msgs)
+                await jimeng_draw_matcher.finish(images_msgs)
                 # 成功处理后，必须跳出重试循环
                 break
 
@@ -219,7 +223,7 @@ async def handle_jimeng_draw(event: MessageEvent,
                 # --- 处理失败响应 (如 4xx, 5xx 错误) ---
                 # 这种错误通常是不可重试的（如认证失败、参数错误），所以直接失败
                 logger.error(f"调用即梦 API 失败: {response.status_code} {response.text}")
-                await jimeng_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+                await jimeng_draw_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
                     f"【即梦绘画】\n绘图失败了，服务器返回错误：\n错误码：{response.status_code}\n错误信息： {response.text}"))
                 # 失败后也要跳出循环
                 break
@@ -232,7 +236,54 @@ async def handle_jimeng_draw(event: MessageEvent,
             logger.exception(f"处理即梦绘图请求时发生错误 (尝试次数 {attempt + 1}): {e}")
             # 如果是最后一次尝试，则发送最终失败消息
             if attempt >= max_retries:
-                await jimeng_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+                await jimeng_draw_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
                     f"【即梦绘画】\n发生严重错误，已重试 {max_retries} 次但仍失败：{e}"))
             else:
                 pass
+
+
+@jimeng_credit_matcher.handle()
+async def handle_check_credit():
+    """处理查询即梦积分的命令"""
+    # 0. 如果未启用多账号模式，则提示用户
+    if not plugin_config.use_account:
+        await jimeng_credit_matcher.finish("【即梦积分】\n当前未启用多账号模式，无法查询积分。")
+        return
+
+    # 1. 发送正在刷新的提示
+    await jimeng_credit_matcher.send("【即梦积分】\n正在获取所有账号的积分信息，请稍候...")
+
+    # 2. 主动调用刷新方法，强制更新所有账号的 session 和积分
+    try:
+        await session_manager.refresh_all_credits()
+    except Exception as e:
+        logger.exception("手动刷新即梦积分时发生错误。")
+        await jimeng_credit_matcher.finish(f"【即梦积分】\n获取积分时遇到错误，请检查后台日志。\n错误信息: {e}")
+        return
+
+    # 3. 获取刷新后的所有账号数据
+    accounts_data = session_manager.get_all_accounts_data()
+
+    # 4. 检查是否有可用账号
+    if not accounts_data:
+        await jimeng_credit_matcher.finish("【即梦积分】\n获取完成，但未找到任何可用的即梦账号。")
+        return
+
+    # 5. 构建积分列表消息
+    total_credit = 0
+    message_lines = ["【即梦积分】\n所有账号积分详情如下："]
+
+    # 排序以保证每次输出顺序一致
+    sorted_accounts = sorted(accounts_data.items(), key=lambda item: item[0])
+
+    for email, data in sorted_accounts:
+        credit = data.get("credit", 0)
+        message_lines.append(f"账号: {email}\n剩余积分: {credit}")
+        total_credit += credit
+
+    message_lines.append("--------------------")
+    message_lines.append(f"总计可用账号: {len(accounts_data)}个")
+    message_lines.append(f"总计剩余积分: {total_credit}")
+
+    # 6. 发送最终结果
+    await jimeng_credit_matcher.finish("\n".join(message_lines))

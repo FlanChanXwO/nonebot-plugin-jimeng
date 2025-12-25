@@ -22,6 +22,8 @@ class ScopedConfig(BaseModel):
     model: str = 'jimeng-4.5'
     # 分辨率
     resolution: str = '2k'
+    # 自动刷新账号积分数据的间隔时间，单位小时，默认1小时
+    refresh_interval: int = 1
 
 class Config(BaseModel):
     jimeng: ScopedConfig = Field(default_factory=ScopedConfig)

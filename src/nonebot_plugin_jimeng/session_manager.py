@@ -234,3 +234,7 @@ class SessionManager:
 
         await self._write_cache()
         logger.info(f"积分刷新完成，可用账号数量: {self.get_available_account_count()}")
+
+    def get_all_accounts_data(self) -> Dict[str, Dict[str, Any]]:
+        """获取所有已加载账号的数据。"""
+        return self._accounts_data
