@@ -114,14 +114,14 @@ JIMENG_ACCOUNTS='[{"email": "your_email1@example.com", "password": "12234" , "re
 ```
 即梦绘画 画一个二次元狐娘给我
 ```
-![img_1.png](./assets/img_1.png)
+![img_1.png](https://github.com/FlanChanXwO/nonebot-plugin-jimeng/blob/master/assets/img_1.png)
 
 **图生图**
 (回复一张图片)
 ```
 即梦绘画 让她躺在一个洁白的床
 ```
-![img.png](./assets/img.png)
+![img.png](https://github.com/FlanChanXwO/nonebot-plugin-jimeng/blob/master/assets/img.png)
 
 ## 🙏 致谢
 感谢 [https://github.com/iptag/jimeng-api](https://github.com/iptag/jimeng-api) 提供的 OpenAPI 支持。
