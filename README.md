@@ -154,6 +154,7 @@ JIMENG_ACCOUNTS='[{"email": "your_email1@example.com", "password": "12234" , "re
 - [x] 完成图生视频功能 (image-to-video)
 - [x] 完成交互式自定义参数生成视频功能 (text/image-to-video)
 - [x] 多账号轮询与积分管理
+- [ ] 更友好的用户错误提示
 
 ## 🙏 致谢
 感谢 [https://github.com/iptag/jimeng-api](https://github.com/iptag/jimeng-api) 提供的 OpenAPI 支持。
