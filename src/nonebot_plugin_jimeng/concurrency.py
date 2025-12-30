@@ -2,6 +2,8 @@ import asyncio
 from typing import Dict
 from nonebot import get_plugin_config
 from nonebot.adapters.onebot.v11 import Event, Bot as OneBotV11Bot
+from nonebot.exception import IgnoredException
+
 from .config import Config
 
 plugin_config = get_plugin_config(Config).jimeng
@@ -24,21 +26,24 @@ async def concurrency_limit(event: Event, bot: OneBotV11Bot):
     在事件处理开始前获取信号量，在结束后释放。
     """
     user_id = event.get_user_id()
-    semaphore = await get_user_semaphore(user_id)
+    command_text = event.get_plaintext()
+    key_prefix = "image" if "绘图" in command_text else "video"
+    key = key_prefix + "_" +user_id
+    semaphore = await get_user_semaphore(key)
 
-    # 尝试立即获取信号量，若已满则丢弃任务并提醒用户
+    can_proceed = False
     try:
-        await asyncio.wait_for(semaphore.acquire(), timeout=5)
-    except asyncio.TimeoutError:
-        await bot.send(event, "你已有一个绘图任务在进行中，请稍后再试。")
-        return
-    except ExceptionGroup:
-        return
-    except RuntimeError:
-        return
-    try:
-        # yield 将控制权交给事件处理器
-        yield
+        # 尝试立即获取信号量，不等待
+        if not semaphore.locked():
+            await semaphore.acquire()
+            can_proceed = True
+            yield True  # 成功，将控制权交给事件处理器
+        else:
+            # 已被锁定，发送提示
+            await bot.send(event, "你已有一个同类任务在进行中，请稍后再试。")
+            yield False # 失败，将控制权交给事件处理器，但传递False
     finally:
-        # 事件处理结束后，无论成功还是失败，都释放信号量
-        semaphore.release()
+        # 只有成功获取了锁，才需要在最后释放
+        if can_proceed:
+            semaphore.release()
+

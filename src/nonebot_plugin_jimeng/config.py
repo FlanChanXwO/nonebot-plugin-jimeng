@@ -13,13 +13,14 @@ class ScopedConfig(BaseModel):
     # 每次重试的间隔时间（秒）
     retry_delay: int = 1
     # 请求超时时间（秒）
-    timeout: int = 300
+    timeout: int = 600
     # 接口地址
     open_api_url: str = ''
     # 密钥（当use_account=true失效）
     secret_key: str = ""
     # 默认模型
-    model: str = 'jimeng-4.5'
+    default_image_model: str = 'jimeng-4.5'
+    default_video_model: str = "jimeng-video-3.0"
     # 分辨率
     resolution: str = '2k'
     # 自动刷新账号积分数据的间隔时间，单位小时，默认1小时

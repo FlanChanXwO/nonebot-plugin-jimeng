@@ -53,7 +53,7 @@ models = [
     {
         "id": "jimeng-3.1",
         "object": "model",
-        "type": "video",
+        "type": "image",
         "description": "仅国内站支持",
         "support_radio": True,
         "cost": 3,
@@ -62,7 +62,7 @@ models = [
     {
         "id": "jimeng-3.0",
         "object": "model",
-        "type": "video",
+        "type": "image",
         "description": "国内、国际站均支持",
         "support_radio": True,
         "cost": 3,
@@ -71,7 +71,7 @@ models = [
     {
         "id": "jimeng-2.1",
         "object": "model",
-        "type": "video",
+        "type": "image",
         "description": "仅国内站支持",
         "support_radio": True,
         "cost": 3,
