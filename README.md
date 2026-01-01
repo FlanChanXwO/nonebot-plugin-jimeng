@@ -15,10 +15,12 @@
 
 ## 📖 介绍
 
-一个基于 NoneBot2 的 AI 绘画插件，通过调用**即梦（Jimeng）**的 OpenAPI 实现文生图和图生图功能。
+一个基于 NoneBot2 的 AI 创作插件，通过调用 **即梦（Jimeng）** 的 OpenAPI 实现图片生成和视频生成功能。
 
 - **文生图**：根据文本描述生成图片。
 - **图生图**：结合图片和文本描述生成新的图片。
+- **文生视频**：根据文本描述生成视频。
+- **图生视频**：根据图片描述生成视频。
 - **多账号支持**：内置简单的多账号轮询和积分管理机制。
 
 ## 💿 安装
@@ -156,6 +158,7 @@ JIMENG_ACCOUNTS='[{"email": "your_email1@example.com", "password": "12234" , "re
 - [x] 完成图生视频功能 (image-to-video)
 - [x] 完成交互式自定义参数生成视频功能 (text/image-to-video)
 - [x] 多账号轮询与积分管理
+- [ ] 更友好的用户错误提示
 
 ## 🙏 致谢
 感谢 [https://github.com/iptag/jimeng-api](https://github.com/iptag/jimeng-api) 提供的 OpenAPI 支持。
