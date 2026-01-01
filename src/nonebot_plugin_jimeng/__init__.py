@@ -36,7 +36,7 @@ __plugin_meta__ = PluginMetadata(
     homepage="https://github.com/FlanChanXwO/nonebot-plugin-jimeng",
     extra={
         "author": "FlanChanXwO",
-        "version": "0.4.1",
+        "version": "0.4.2",
     },
 )
 
@@ -238,10 +238,10 @@ async def process_video_request(bot: OneBotV11Bot, event: MessageEvent, params: 
     semaphore = await get_user_semaphore(user_id + "_video")
 
     # 尝试获取锁，如果已被锁定则提示用户并结束
+    await semaphore.acquire()
     if semaphore.locked():
         await jimeng_draw_matcher.finish("【即梦视频】\n你已经有一个视频生成任务在进行中了，请耐心等待任务完成后再试。")
         return
-    await semaphore.acquire()
     try:
         bot_name = await get_bot_name(bot, event)
         is_in_group = isinstance(event, GroupMessageEvent)
@@ -337,10 +337,10 @@ async def handle_jimeng_draw(event: MessageEvent, bot: OneBotV11Bot,
     semaphore = await get_user_semaphore(user_id + "_image")
 
     # 尝试获取锁，如果已被锁定则提示用户并结束
+    await semaphore.acquire()
     if semaphore.locked():
         await jimeng_draw_matcher.finish("【即梦绘画】\n你已经有一个绘画任务在进行中了，请耐心等待任务完成后再试。")
         return
-    await semaphore.acquire()
     try:
         prompt = prompt_group[0].strip()
         user_id = event.get_user_id()
