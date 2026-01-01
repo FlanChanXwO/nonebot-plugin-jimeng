@@ -75,20 +75,24 @@
 
 在您的 nonebot2 项目的 `.env` 或 `.env.prod` 文件中添加以下配置项。
 
-|                   配置项                   | 必填 |     默认值      | 说明                                                                                                                                |
-|:---------------------------------------:|:--:|:------------:|:----------------------------------------------------------------------------------------------------------------------------------|
-|           `JIMENG__ACCOUNTS`            | 否  |     `[]`     | 即梦账号（目前主要是国际服支持账密登录）列表。当 `JIMENG_USE_ACCOUNT=true` 时需要填写。格式为 `'[{"account": "user1@example.com", "password": "password1"}, ...]'` |
-|          `JIMENG__USE_ACCOUNT`          | 否  |    `True`    | 是否通过账号自动获取密钥。如果设为 `False`，则需要提供 `JIMENG_SECRET_KEY`。                                                                              |
-|         `JIMENG__OPEN_API_URL`          | 否  |     `''`     | 逆向 API 的地址或官方API地址。                                                                                                               |
-|      `JIMENG__DEFAULT_IMAGE_MODEL`      | 否  | `jimeng-4.5` | 默认使用的图像生成模型。                                                                                                                      |
-|      `JIMENG__DEFAULT_VIDEO_MODEL`      | 否  | `jimeng-video-3.0` | 默认使用的视频生成模型。                                                                                                                      |
-|          `JIMENG__RESOLUTION`           | 否  |     `2k`     | 图像模型生成分辨率。                                                                                                                        |
-| `JIMENG__MAX_CONCURRENT_TASKS_PER_USER` | 否  |     `2`      | 每个用户的最大并发任务数。                                                                                                                     |
-|          `JIMENG__MAX_RETRIES`          | 否  |     `3`      | 请求失败时的最大重试次数，一般是上传图片出现问题重试。                                                                                                       |
-|          `JIMENG__RETRY_DELAY`          | 否  |     `1`      | 每次重试的间隔时间（秒）。                                                                                                                     |
-|            `JIMENG__TIMEOUT`            | 否  |    `600`     | 发送API请求的超时时间（秒）。如果为`-1`则不会有超时设置                                                                                                   |
-|          `JIMENG__SECRET_KEY`           | 否  |     `""`     | API 密钥。当 `JIMENG_USE_ACCOUNT=false` 时生效。                                                                                          |
-|       `JIMENG__REFRESH_INTERVAL`        | 否  |     `1`      | 自动刷新账号积分数据的间隔时间，单位小时，默认1小时                                                                                                        |
+|                   配置项                   | 必填 |         默认值         | 说明                                                                                                                                |
+|:---------------------------------------:|:--:|:-------------------:|:----------------------------------------------------------------------------------------------------------------------------------|
+|           `JIMENG__ACCOUNTS`            | 否  |        `[]`         | 即梦账号（目前主要是国际服支持账密登录）列表。当 `JIMENG_USE_ACCOUNT=true` 时需要填写。格式为 `'[{"account": "user1@example.com", "password": "password1"}, ...]'` |
+|          `JIMENG__USE_ACCOUNT`          | 否  |       `True`        | 是否通过账号自动获取密钥。如果设为 `False`，则需要提供 `JIMENG_SECRET_KEY`。                                                                              |
+|         `JIMENG__OPEN_API_URL`          | 否  |        `''`         | 逆向 API 的地址或官方API地址。                                                                                                               |
+|      `JIMENG__DEFAULT_IMAGE_MODEL`      | 否  |    `jimeng-4.5`     | 默认使用的图像生成模型。                                                                                                                      |
+|      `JIMENG__DEFAULT_VIDEO_MODEL`      | 否  | `jimeng-video-3.0`  | 默认使用的视频生成模型。                                                                                                                      |
+|          `JIMENG__RESOLUTION`           | 否  |        `2k`         | 图像模型生成分辨率。                                                                                                                        |
+| `JIMENG__MAX_CONCURRENT_TASKS_PER_USER` | 否  |         `2`         | 每个用户的最大并发任务数。                                                                                                                     |
+|          `JIMENG__MAX_RETRIES`          | 否  |         `3`         | 请求失败时的最大重试次数，一般是上传图片出现问题重试。                                                                                                       |
+|          `JIMENG__RETRY_DELAY`          | 否  |         `1`         | 每次重试的间隔时间（秒）。                                                                                                                     |
+|            `JIMENG__TIMEOUT`            | 否  |        `600`        | 发送API请求的超时时间（秒）。如果为`-1`则不会有超时设置                                                                                                   |
+|          `JIMENG__SECRET_KEY`           | 否  |        `""`         | API 密钥。当 `JIMENG_USE_ACCOUNT=false` 时生效。                                                                                          |
+|       `JIMENG__PROXY_TYPE`        | 否  |       `None`        | 代理类型可选: "http", "socks5", None（在.env文件中直接填入`JIMENG__PROXY_TYPE=`即可）                                                               |
+|       `JIMENG__PROXY_HOST`        | 否  |    `"127.0.0.1"`    | 代理服务器地址                                                                                                                           |
+|       `JIMENG__PROXY_PORT`        | 否  |       `7890`        | 代理服务器端口                                                                                                        |
+|       `JIMENG__PROXY_USERNAME`        | 否  |         `None`         | 代理用户名 (可选)                                                                                                        |
+|       `JIMENG__PROXY_PASSWORD`        | 否  |         `None`         | 代理密码 (可选)                                                                                                        |
 ### `JIMENG_ACCOUNTS` 格式说明
 这是一个 JSON 字符串数组，每个对象代表一个即梦账号。插件启动时会根据此配置初始化 `session_id`。
 

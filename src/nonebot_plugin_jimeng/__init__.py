@@ -14,7 +14,7 @@ from nonebot.permission import SUPERUSER
 from nonebot.plugin import PluginMetadata, get_plugin_config
 from nonebot.typing import T_State
 
-from .concurrency import concurrency_limit
+from .concurrency import  get_user_semaphore
 from .config import Config
 from .models import get_cost_by_id, models as all_models
 from .session_manager import SessionManager
@@ -36,7 +36,7 @@ __plugin_meta__ = PluginMetadata(
     homepage="https://github.com/FlanChanXwO/nonebot-plugin-jimeng",
     extra={
         "author": "FlanChanXwO",
-        "version": "0.4.0",
+        "version": "0.4.1",
     },
 )
 
@@ -231,208 +231,233 @@ async def handle_video_ratio(bot: OneBotV11Bot, event: MessageEvent, state: T_St
 
 
 
-async def process_video_request(bot: OneBotV11Bot, event: MessageEvent, params: Dict[str, Any], _=Depends(concurrency_limit)):
+async def process_video_request(bot: OneBotV11Bot, event: MessageEvent, params: Dict[str, Any]):
     """核心视频请求处理函数 (统一本地上传)"""
     user_id = event.get_user_id()
-    bot_name = await get_bot_name(bot, event)
-    is_in_group = isinstance(event, GroupMessageEvent)
+    # 获取用户专属的信号量锁
+    semaphore = await get_user_semaphore(user_id + "_video")
 
-    if not params.get("prompt"):
-        await jimeng_video_matcher.finish("【即梦视频】\n内部错误：缺少必要的 prompt 参数。")
+    # 尝试获取锁，如果已被锁定则提示用户并结束
+    if semaphore.locked():
+        await jimeng_draw_matcher.finish("【即梦视频】\n你已经有一个视频生成任务在进行中了，请耐心等待任务完成后再试。")
         return
+    await semaphore.acquire()
+    try:
+        bot_name = await get_bot_name(bot, event)
+        is_in_group = isinstance(event, GroupMessageEvent)
 
-    expect_cost = get_cost_by_id(params.get("model", plugin_config.default_video_model))
-    account = session_manager.get_available_account(expect_cost)
-    if not account:
-        await jimeng_video_matcher.finish(
-            (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
-                f"【即梦视频】\n当前所有账号积分不足以支付本次消耗（需要 {expect_cost} 积分），请稍后再试。"))
-        return
-
-    session_id, email, region = account["session_id"], account["email"], account["region"]
-    logger.info(f"使用账号 {email} 进行视频生成，预估消耗 {expect_cost} 积分。")
-
-    # --- 图片下载与准备 ---
-    image_urls_to_download = params.pop("filePaths", [])
-    files_to_upload: Dict[str, Tuple[str, io.BytesIO, str]] = {}
-    if image_urls_to_download:
-        await jimeng_video_matcher.send("【即梦视频】\n参数设置完成！正在下载并准备图片...")
-        try:
-            image_bytes_list = await download_images_to_bytes(image_urls_to_download)
-            for i, img_bytes in enumerate(image_bytes_list):
-                field_name = f"image_file_{i + 1}"
-                files_to_upload[field_name] = (f"image_{i + 1}.png", io.BytesIO(img_bytes), "image/png")
-        except Exception as e:
-            await jimeng_video_matcher.finish(f"【即梦视频】\n图片处理失败: {e}")
+        if not params.get("prompt"):
+            await jimeng_video_matcher.finish("【即梦视频】\n内部错误：缺少必要的 prompt 参数。")
             return
 
-    await jimeng_video_matcher.send((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
-        f"【即梦视频】\n{bot_name}正在生成视频，任务已提交，请耐心等待，预计至少耗时5~8分钟，高峰期时可能不止5~8分钟，也许会非常非常久..."))
-
-    api_url = f"{plugin_config.open_api_url}/v1/videos/generations"
-    key_prefix = key_prefix_by_region(region)
-    auth_header = f"Bearer {key_prefix}{session_id}" if plugin_config.use_account else plugin_config.secret_key
-    headers = {"Authorization": auth_header}
-
-    logger.debug("params = " + str(params))
-
-    try:
-        async with httpx.AsyncClient() as client:
-            timeout_value = None if plugin_config.timeout == -1 else plugin_config.timeout
-            response = await client.post(api_url, data=params, files=files_to_upload, headers=headers,
-                                         timeout=timeout_value)
-
-        if response.status_code == 200:
-            res_json = response.json()
-            video_data = res_json.get("data")
-            if not video_data or not isinstance(video_data, list) or not video_data[0].get("url"):
-                raise Exception(res_json.get("message", "API返回数据格式错误"))
-
-            video_url = video_data[0]["url"]
-            logger.success(f"视频生成成功，URL: {video_url}")
-
-            async with httpx.AsyncClient() as video_client:
-                video_res = await video_client.get(video_url, timeout=300.0)
-                video_res.raise_for_status()
-                video_content = video_res.content
-
-            await jimeng_video_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") +
-                                              MessageSegment.text("【即梦视频】\n视频生成完成！") +
-                                              MessageSegment.video(video_content))
-        else:
-            logger.error(f"调用即梦视频 API 失败: {response.status_code} {response.text}")
+        expect_cost = get_cost_by_id(params.get("model", plugin_config.default_video_model))
+        account = session_manager.get_available_account(expect_cost)
+        if not account:
             await jimeng_video_matcher.finish(
                 (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
-                    f"【即梦视频】\n视频生成失败：\n错误码：{response.status_code}\n信息： {response.text}"))
-    except FinishedException:
-        pass
-    except IgnoredException:
-        pass
-    except Exception as e:
-        logger.exception("处理即梦视频请求时发生错误")
-        await jimeng_video_matcher.finish(
-            (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
-                f"【即梦视频】\n发生严重错误：{e}"))
-
-
-# --- 绘画处理器 (保持不变) ---
-@jimeng_draw_matcher.handle()
-async def handle_jimeng_draw(event: MessageEvent, bot: OneBotV11Bot, _=Depends(concurrency_limit),
-                             prompt_group: tuple = RegexGroup()):
-    """图生图&文生图处理器 (V2 - 图生图统一本地上传)"""
-    prompt = prompt_group[0].strip()
-    user_id = event.get_user_id()
-    bot_name = await get_bot_name(bot, event)
-    is_in_group = isinstance(event, GroupMessageEvent)
-
-    image_url, is_img2img = None, False
-    if event.reply:
-        for seg in event.reply.message:
-            if seg.type == "image":
-                image_url = seg.data.get("url")
-                if image_url:
-                    is_img2img = True
-                    logger.info(f"检测到图生图请求，图片URL: {image_url}")
-                break
-        if not is_img2img:
-            await jimeng_draw_matcher.finish(MessageSegment.text("【即梦绘画】\n请引用图片进行图生图绘画哦！"))
-            return
-    if not prompt and not is_img2img:  # 文生图必须有prompt
-        await jimeng_draw_matcher.finish(MessageSegment.text("【即梦绘画】\n请输入你想要画的内容！"))
-        return
-
-    cost = get_cost_by_id(plugin_config.default_image_model)
-    expect_cost = cost * 4
-    account = session_manager.get_available_account(expect_cost)
-    if not account:
-        await jimeng_draw_matcher.finish(
-            (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
-                f"【即梦绘画】\n当前所有账号积分不足以支付本次消耗（需要 {expect_cost} 积分），请稍后再试。"))
-        return
-
-    session_id, email, region = account["session_id"], account["email"], account["region"]
-    logger.info(f"使用账号 {email} 进行绘图，预估消耗 {expect_cost} 积分。")
-
-    # --- 图片下载与准备 (图生图) ---
-    files_to_upload: Dict[str, Tuple[str, io.BytesIO, str]] = {}
-    if is_img2img:
-        await jimeng_draw_matcher.send("【即梦绘画】\n正在下载并准备图片，请稍候...")
-        try:
-            # 图生图API只支持一张图片，字段为 images
-            image_bytes_list = await download_images_to_bytes([image_url])
-            files_to_upload["images"] = ("image.png", io.BytesIO(image_bytes_list[0]), "image/png")
-        except Exception as e:
-            await jimeng_draw_matcher.finish(f"【即梦绘画】\n图片处理失败: {e}")
+                    f"【即梦视频】\n当前所有账号积分不足以支付本次消耗（需要 {expect_cost} 积分），请稍后再试。"))
             return
 
-    await jimeng_draw_matcher.send((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
-        f"【即梦绘图】\n{bot_name}正在绘画哦，花费时间至少1~3分钟，请稍候..."))
+        session_id, email, region = account["session_id"], account["email"], account["region"]
+        logger.info(f"使用账号 {email} 进行视频生成，预估消耗 {expect_cost} 积分。")
 
-    api_url = f"{plugin_config.open_api_url}/v1/images/{'compositions' if is_img2img else 'generations'}"
-    key_prefix = key_prefix_by_region(region)
-    headers = {
-        "Authorization": f"Bearer {key_prefix}{session_id}" if plugin_config.use_account else plugin_config.secret_key}
+        # --- 图片下载与准备 ---
+        image_urls_to_download = params.pop("filePaths", [])
+        files_to_upload: Dict[str, Tuple[str, io.BytesIO, str]] = {}
+        if image_urls_to_download:
+            await jimeng_video_matcher.send("【即梦视频】\n参数设置完成！正在下载并准备图片...")
+            try:
+                image_bytes_list = await download_images_to_bytes(image_urls_to_download)
+                for i, img_bytes in enumerate(image_bytes_list):
+                    field_name = f"image_file_{i + 1}"
+                    files_to_upload[field_name] = (f"image_{i + 1}.png", io.BytesIO(img_bytes), "image/png")
+            except Exception as e:
+                await jimeng_video_matcher.finish(f"【即梦视频】\n图片处理失败: {e}")
+                return
 
-    payload = {"model": plugin_config.default_image_model, "prompt": prompt, "resolution": plugin_config.resolution}
+        await jimeng_video_matcher.send((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+            f"【即梦视频】\n{bot_name}正在生成视频，任务已提交，请耐心等待，预计至少耗时5~8分钟，高峰期时可能不止5~8分钟，也许会非常非常久..."))
 
-    max_retries, retry_delay = plugin_config.max_retries, plugin_config.retry_delay
-    for attempt in range(max_retries + 1):
+        api_url = f"{plugin_config.open_api_url}/v1/videos/generations"
+        key_prefix = key_prefix_by_region(region)
+        auth_header = f"Bearer {key_prefix}{session_id}" if plugin_config.use_account else plugin_config.secret_key
+        headers = {"Authorization": auth_header}
+
+        logger.debug("params = " + str(params))
+
         try:
             async with httpx.AsyncClient() as client:
                 timeout_value = None if plugin_config.timeout == -1 else plugin_config.timeout
-                if is_img2img:  # 图生图：multipart
-                    response = await client.post(api_url, data=payload, files=files_to_upload, headers=headers,
-                                                 timeout=timeout_value)
-                else:  # 文生图：json
-                    headers["Content-Type"] = "application/json"
-
-                    response = await client.post(api_url, json=payload, headers=headers, timeout=timeout_value)
+                response = await client.post(api_url, data=params, files=files_to_upload, headers=headers,
+                                             timeout=timeout_value)
 
             if response.status_code == 200:
                 res_json = response.json()
-                img_data_list = res_json.get("data")
-                if img_data_list is None:
-                    if res_json.get("code") == -2007 and attempt < max_retries:
-                        logger.warning(f"API返回上传失败，准备重试。响应: {res_json}")
-                        await asyncio.sleep(retry_delay)
-                        continue
-                    raise Exception(res_json.get("message", "API返回未知错误，data为空。"))
+                video_data = res_json.get("data")
+                if not video_data or not isinstance(video_data, list) or not video_data[0].get("url"):
+                    raise Exception(res_json.get("message", "API返回数据格式错误"))
 
-                img_count = len(img_data_list)
-                actual_cost = img_count * cost
-                if plugin_config.use_account:
-                    await session_manager.update_credit(email, actual_cost)
-                logger.success(f"账号 {email} 绘图成功，消耗 {actual_cost} 积分。")
+                video_url = video_data[0]["url"]
+                logger.success(f"视频生成成功，URL: {video_url}")
 
-                images_msgs = (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
-                    f"【即梦绘画】\n完成【共{img_count}张】")
+                async with httpx.AsyncClient() as video_client:
+                    video_res = await video_client.get(video_url, timeout=300.0)
+                    video_res.raise_for_status()
+                    video_content = video_res.content
 
-                # 下载结果图
-                result_urls = [img["url"] for img in img_data_list]
-                image_contents = await download_images_to_bytes(result_urls)
-                for content in image_contents:
-                    if content: images_msgs.append(MessageSegment.image(content))
-
-                await jimeng_draw_matcher.finish(images_msgs)
-                break
+                await jimeng_video_matcher.finish((MessageSegment.at(user_id) + "\n" if is_in_group else "") +
+                                                  MessageSegment.text("【即梦视频】\n视频生成完成！") +
+                                                  MessageSegment.video(video_content))
             else:
-                logger.error(f"调用即梦 API 失败: {response.status_code} {response.text}")
-                await jimeng_draw_matcher.finish(
+                logger.error(f"调用即梦视频 API 失败: {response.status_code} {response.text}")
+                await jimeng_video_matcher.finish(
                     (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
-                        f"【即梦绘画】\n绘图失败了：\n错误码：{response.status_code}\n信息： {response.text}"))
-                break
+                        f"【即梦视频】\n视频生成失败：\n错误码：{response.status_code}\n信息： {response.text}"))
         except FinishedException:
             pass
         except IgnoredException:
             pass
         except Exception as e:
-            logger.exception(f"处理即梦绘图请求时发生错误 (尝试次数 {attempt + 1}): {e}")
-            if attempt >= max_retries:
-                await jimeng_draw_matcher.finish(
-                    (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
-                        f"【即梦绘画】\n发生严重错误，已重试 {max_retries} 次但仍失败：{e}"))
-                break
+            logger.exception("处理即梦视频请求时发生错误")
+            await jimeng_video_matcher.finish(
+                (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+                    f"【即梦视频】\n发生严重错误：{e}"))
+    finally:
+        # 无论函数如何退出（正常完成、异常、finish），最终都会执行这行代码，释放锁
+        if semaphore.locked():
+             semaphore.release()
 
+# --- 绘画处理器 (保持不变) ---
+@jimeng_draw_matcher.handle()
+async def handle_jimeng_draw(event: MessageEvent, bot: OneBotV11Bot,
+                             prompt_group: tuple = RegexGroup()):
+    """图生图&文生图处理器"""
+    user_id = event.get_user_id()
+    # 获取用户专属的信号量锁
+    semaphore = await get_user_semaphore(user_id + "_image")
+
+    # 尝试获取锁，如果已被锁定则提示用户并结束
+    if semaphore.locked():
+        await jimeng_draw_matcher.finish("【即梦绘画】\n你已经有一个绘画任务在进行中了，请耐心等待任务完成后再试。")
+        return
+    await semaphore.acquire()
+    try:
+        prompt = prompt_group[0].strip()
+        user_id = event.get_user_id()
+        bot_name = await get_bot_name(bot, event)
+        is_in_group = isinstance(event, GroupMessageEvent)
+
+        image_url, is_img2img = None, False
+        if event.reply:
+            for seg in event.reply.message:
+                if seg.type == "image":
+                    image_url = seg.data.get("url")
+                    if image_url:
+                        is_img2img = True
+                        logger.info(f"检测到图生图请求，图片URL: {image_url}")
+                    break
+            if not is_img2img:
+                await jimeng_draw_matcher.finish(MessageSegment.text("【即梦绘画】\n请引用图片进行图生图绘画哦！"))
+                return
+        if not prompt and not is_img2img:  # 文生图必须有prompt
+            await jimeng_draw_matcher.finish(MessageSegment.text("【即梦绘画】\n请输入你想要画的内容！"))
+            return
+
+        cost = get_cost_by_id(plugin_config.default_image_model)
+        expect_cost = cost * 4
+        account = session_manager.get_available_account(expect_cost)
+        if not account:
+            await jimeng_draw_matcher.finish(
+                (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+                    f"【即梦绘画】\n当前所有账号积分不足以支付本次消耗（需要 {expect_cost} 积分），请稍后再试。"))
+            return
+
+        session_id, email, region = account["session_id"], account["email"], account["region"]
+        logger.info(f"使用账号 {email} 进行绘图，预估消耗 {expect_cost} 积分。")
+
+        # --- 图片下载与准备 (图生图) ---
+        files_to_upload: Dict[str, Tuple[str, io.BytesIO, str]] = {}
+        if is_img2img:
+            await jimeng_draw_matcher.send("【即梦绘画】\n正在下载并准备图片，请稍候...")
+            try:
+                # 图生图API只支持一张图片，字段为 images
+                image_bytes_list = await download_images_to_bytes([image_url])
+                files_to_upload["images"] = ("image.png", io.BytesIO(image_bytes_list[0]), "image/png")
+            except Exception as e:
+                await jimeng_draw_matcher.finish(f"【即梦绘画】\n图片处理失败: {e}")
+                return
+
+        await jimeng_draw_matcher.send((MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+            f"【即梦绘图】\n{bot_name}正在绘画哦，花费时间至少1~3分钟，请稍候..."))
+
+        api_url = f"{plugin_config.open_api_url}/v1/images/{'compositions' if is_img2img else 'generations'}"
+        key_prefix = key_prefix_by_region(region)
+        headers = {
+            "Authorization": f"Bearer {key_prefix}{session_id}" if plugin_config.use_account else plugin_config.secret_key}
+
+        payload = {"model": plugin_config.default_image_model, "prompt": prompt, "resolution": plugin_config.resolution}
+
+        max_retries, retry_delay = plugin_config.max_retries, plugin_config.retry_delay
+        for attempt in range(max_retries + 1):
+            try:
+                async with httpx.AsyncClient() as client:
+                    timeout_value = None if plugin_config.timeout == -1 else plugin_config.timeout
+                    if is_img2img:  # 图生图：multipart
+                        response = await client.post(api_url, data=payload, files=files_to_upload, headers=headers,
+                                                     timeout=timeout_value)
+                    else:  # 文生图：json
+                        headers["Content-Type"] = "application/json"
+
+                        response = await client.post(api_url, json=payload, headers=headers, timeout=timeout_value)
+
+                if response.status_code == 200:
+                    res_json = response.json()
+                    img_data_list = res_json.get("data")
+                    if img_data_list is None:
+                        if res_json.get("code") == -2007 and attempt < max_retries:
+                            logger.warning(f"API返回上传失败，准备重试。响应: {res_json}")
+                            await asyncio.sleep(retry_delay)
+                            continue
+                        raise Exception(res_json.get("message", "API返回未知错误，data为空。"))
+
+                    img_count = len(img_data_list)
+                    actual_cost = img_count * cost
+                    if plugin_config.use_account:
+                        await session_manager.update_credit(email, actual_cost)
+                    logger.success(f"账号 {email} 绘图成功，消耗 {actual_cost} 积分。")
+
+                    images_msgs = (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+                        f"【即梦绘画】\n完成【共{img_count}张】")
+
+                    # 下载结果图
+                    result_urls = [img["url"] for img in img_data_list]
+                    image_contents = await download_images_to_bytes(result_urls)
+                    for content in image_contents:
+                        if content: images_msgs.append(MessageSegment.image(content))
+
+                    await jimeng_draw_matcher.finish(images_msgs)
+                    break
+                else:
+                    logger.error(f"调用即梦 API 失败: {response.status_code} {response.text}")
+                    await jimeng_draw_matcher.finish(
+                        (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+                            f"【即梦绘画】\n绘图失败了：\n错误码：{response.status_code}\n信息： {response.text}"))
+                    break
+            except FinishedException:
+                pass
+            except IgnoredException:
+                pass
+            except Exception as e:
+                logger.exception(f"处理即梦绘图请求时发生错误 (尝试次数 {attempt + 1}): {e}")
+                if attempt >= max_retries:
+                    await jimeng_draw_matcher.finish(
+                        (MessageSegment.at(user_id) + "\n" if is_in_group else "") + MessageSegment.text(
+                            f"【即梦绘画】\n发生严重错误，已重试 {max_retries} 次但仍失败：{e}"))
+                    break
+    finally:
+        # 无论函数如何退出（正常完成、异常、finish），最终都会执行这行代码，释放锁
+        if semaphore.locked():
+             semaphore.release()
 
 # --- 积分查询处理器 (保持不变) ---
 @jimeng_credit_matcher.handle()

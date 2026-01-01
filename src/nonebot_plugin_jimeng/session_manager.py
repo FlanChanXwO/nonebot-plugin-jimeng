@@ -1,4 +1,4 @@
-from nonebot import require
+from nonebot import require, get_plugin_config
 import asyncio
 import json
 import random
@@ -9,6 +9,15 @@ from nonebot.log import logger
 
 require("nonebot_plugin_localstore")
 from nonebot_plugin_localstore import get_plugin_cache_file
+from .proxy import get_proxy_url
+from .config import Config
+plugin_config = get_plugin_config(Config).jimeng
+
+def get_proxy_config_url() -> Optional[str]:
+    """
+    获取即梦绘画插件的代理配置 URL。
+    """
+    return get_proxy_url(plugin_config)
 
 class SessionManager:
     """
@@ -53,10 +62,11 @@ class SessionManager:
         }
         cookies = {"sessionid": session_id}
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(proxy=get_proxy_config_url()) as client:
                 response = await client.post(url, headers=headers, cookies=cookies)
             if response.status_code == 200:
                 data = response.json()
+                logger.info(data)
                 if data.get("ret") == "0":
                     credit_info = data["data"]["credit"]
                     total = sum(credit_info.get(k, 0) for k in ["vip_credit", "gift_credit", "purchase_credit"])
@@ -77,7 +87,7 @@ class SessionManager:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(proxy=get_proxy_config_url()) as client:
                 response = await client.post(url, params=params, data=form_data,headers=headers)
             if response.status_code == 200 and response.json().get("message") == "success":
                 session_id = response.cookies.get("sessionid")
