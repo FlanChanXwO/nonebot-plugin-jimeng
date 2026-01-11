@@ -35,7 +35,7 @@ __plugin_meta__ = PluginMetadata(
     homepage="https://github.com/FlanChanXwO/nonebot-plugin-jimeng",
     extra={
         "author": "FlanChanXwO",
-        "version": "0.4.3",
+        "version": "0.4.4",
     },
 )
 

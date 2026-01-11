@@ -10,7 +10,6 @@ def get_proxy_url(plugin_config: ScopedConfig) -> Optional[str]:
     """
     # 检查是否配置了代理类型和主机
     if not plugin_config.proxy_type or not plugin_config.proxy_host:
-        logger.debug("[Proxy Config] 未配置代理, 将直接连接。")
         return None
 
     proxy_url = ""
@@ -33,6 +32,5 @@ def get_proxy_url(plugin_config: ScopedConfig) -> Optional[str]:
         logger.warning(f"[Proxy Config] 无效的 proxy_type: {plugin_config.proxy_type}")
         return None
 
-    logger.debug(f"[Proxy Config] 插件已配置代理: {proxy_url}")
     return proxy_url
 

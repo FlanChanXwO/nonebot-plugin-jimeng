@@ -1,6 +1,6 @@
 [project]
 name = "nonebot-plugin-jimeng"
-version = "0.4.3"
+version = "0.4.4"
 description = "一个基于 NoneBot2 的 AI 绘画插件，通过调用**即梦（Jimeng）**的 OpenAPI 实现文生图和图生图功能。"
 readme = "README.md"
 authors = [{ name = "FlanChanXwO", email = "badapple495@outlook.com" }]
