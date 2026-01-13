@@ -35,7 +35,7 @@ __plugin_meta__ = PluginMetadata(
     homepage="https://github.com/FlanChanXwO/nonebot-plugin-jimeng",
     extra={
         "author": "FlanChanXwO",
-        "version": "0.4.4",
+        "version": "0.4.5",
     },
 )
 
@@ -164,20 +164,22 @@ async def handle_video_ratio(bot: OneBotV11Bot, event: MessageEvent, state: T_St
     choice = state["ratio"].extract_plain_text().strip()
     if choice in ["跳过", "skip"]:
         state["params"]["ratio"] = "16:9"
-        return
-
-    try:
+    elif not isinstance(choice, int):
+        await jimeng_video_matcher.reject("请输入数字序号或“跳过”。")
+    else:
         idx = int(choice) - 1
         if 0 <= idx < len(VIDEO_RATIOS):
             state["params"]["ratio"] = VIDEO_RATIOS[idx]
-            # --- 所有参数收集完毕，开始执行 ---
-            params = state["params"]
-            # 将暂存的图片URL加入
-            params["filePaths"] = state.get("image_urls", [])
-            logger.info(f"视频生成交互完成，最终参数: {params}")
-            await process_video_request(bot, event, params)
         else:
             await jimeng_video_matcher.reject("无效的序号，请重新输入。")
+
+    try:
+        # 所有参数收集完毕，开始执行
+        params = state["params"]
+        # 将暂存的图片URL加入
+        params["filePaths"] = state.get("image_urls", [])
+        logger.info(f"视频生成交互完成，最终参数: {params}")
+        await process_video_request(bot, event, params)
     except ValueError:
         await jimeng_video_matcher.reject("请输入数字序号或“跳过”。")
 
